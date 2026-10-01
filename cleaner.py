@@ -31,7 +31,7 @@ URLS = [
     "https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_merge.txt",
     "https://raw.githubusercontent.com/Pawdroid/Free-servers/main/sub",
     "https://raw.githubusercontent.com/ermaozi/get_subscribe/main/subscribe/v2ray.txt",
-    "https://empty-mouse-fbb7.alizareh4024.workers.dev/sync?sub=%D8%B3%D9%88%D8%B3%D9%85%D8%A7%D8%B1%F0%9F%A6%8E",
+    "https://empty-mouse-fbb7.alizareh4024.workers.dev/sync?sub=%D8%B3%D9%88%D8%B3%D9%8D%D8%A7%D8%B1%F0%9F%A6%8E",
     "https://raw.githubusercontent.com/pytimusprime/FreeV2ray/refs/heads/main/all_servers.txt",
     "https://raw.githubusercontent.com/ThomasJasperthecat/sub/main/sublist1.txt",
     "https://raw.githubusercontent.com/masir-sefid/Sub/main/@Masir_Sefid.txt",
@@ -67,7 +67,6 @@ URLS = [
     "https://raw.githubusercontent.com/SoliSpirit/v2ray-configs/refs/heads/main/Protocols/vless.txt"
 ]
 
-
 # وب‌سایت‌های هدف تست اتصال واقعی
 TARGETS = [
     "https://www.instagram.com",
@@ -76,6 +75,9 @@ TARGETS = [
     "https://www.amazon.com",
     "https://www.openai.com"
 ]
+
+# لینک تست سرعت دانلود (۱ مگابایت از CDN کلودفلر)
+DOWNLOAD_URL = "https://speed.cloudflare.com/__down?bytes=1048576"
 
 start_time = time.time()
 current_stage = "شروع پروژه"
@@ -147,11 +149,11 @@ async def async_test_ping_and_stddev(node, semaphore):
                 return None  
             pings.append(p)
             await asyncio.sleep(0.04)
-        
+
         mean = sum(pings) / len(pings)
         variance = sum((x - mean) ** 2 for x in pings) / len(pings)
         std_dev = math.sqrt(variance)
-        
+
         if std_dev > 200:
             return None
         return node
@@ -160,11 +162,11 @@ async def run_async_pings(parsed_nodes):
     global progress_info
     semaphore = asyncio.Semaphore(500) 
     tasks = [async_test_ping_and_stddev(node, semaphore) for node in parsed_nodes]
-    
+
     alive_nodes = []
     total_nodes = len(tasks)
     idx = 0
-    
+
     for coro in asyncio.as_completed(tasks):
         res = await coro
         idx += 1
@@ -173,28 +175,27 @@ async def run_async_pings(parsed_nodes):
         if idx % 300 == 0 or idx == total_nodes:
             progress_info = f"تست پینگ ناهمگام: {idx}/{total_nodes} انجام شد. زنده: {len(alive_nodes)}"
             log(progress_info)
-            
+
     return alive_nodes
 
-# --- بخش جدید: تست پینگ ثانویه و حذف پینگ‌های نامتعارف ---
+# --- بخش تست پینگ ثانویه و حذف پینگ‌های نامتعارف ---
 async def run_final_ping_filter(nodes, min_ping, max_ping):
     global progress_info
-    semaphore = asyncio.Semaphore(200) # تعداد کانفیگ‌ها در این مرحله کمتر است، ۲۰۰ موازی کاملاً امن است
-    
+    semaphore = asyncio.Semaphore(200)
+
     async def final_check(node):
         async with semaphore:
             pings = []
-            for _ in range(2): # دو بار پینگ برای اطمینان کافیست
+            for _ in range(2):
                 p = await async_tcp_ping(node["host"], node["port"])
                 if p is not None:
                     pings.append(p)
                 await asyncio.sleep(0.03)
-            
+
             if not pings:
                 return None
-                
+
             avg_ping = sum(pings) / len(pings)
-            # فیلتر کردن پینگ‌های خارج از محدوده مجاز
             if min_ping <= avg_ping <= max_ping:
                 return node
             return None
@@ -203,7 +204,7 @@ async def run_final_ping_filter(nodes, min_ping, max_ping):
     filtered_nodes = []
     total = len(tasks)
     idx = 0
-    
+
     for coro in asyncio.as_completed(tasks):
         res = await coro
         idx += 1
@@ -212,7 +213,7 @@ async def run_final_ping_filter(nodes, min_ping, max_ping):
         if idx % 20 == 0 or idx == total:
             progress_info = f"فیلتر نهایی پینگ: {idx}/{total} انجام شد. تایید شده نهایی: {len(filtered_nodes)}"
             log(progress_info)
-            
+
     return filtered_nodes
 
 # --- پایان بخش Async ---
@@ -224,23 +225,23 @@ def parse_vless(url_str):
             base_part, query_part = clean_url.split('?', 1)
         else:
             base_part, query_part = clean_url, ""
-            
+
         netloc = base_part.replace("vless://", "")
         if '@' not in netloc:
             return None
         uuid, address_port = netloc.split('@', 1)
-        
+
         if ':' not in address_port:
             return None
-        
+
         if ']' in address_port:
             address = address_port.split(']')[0] + ']'
             port_str = address_port.split(']')[-1].replace(':', '')
         else:
             address, port_str = address_port.split(':', 1)
-            
+
         port = int(port_str)
-        
+
         query = {}
         if query_part:
             for pair in query_part.split('&'):
@@ -268,7 +269,7 @@ def parse_vless(url_str):
             },
             "streamSettings": {"network": network, "security": security}
         }
-        
+
         if flow:
             outbound["settings"]["vnext"][0]["users"][0]["flow"] = flow
 
@@ -306,11 +307,11 @@ def test_xray_node(node, local_port):
         }],
         "outbounds": [node["outbound"]]
     }
-    
+
     config_path = f"config_{local_port}.json"
     with open(config_path, "w") as f:
         json.dump(config, f)
-        
+
     process = None
     try:
         process = subprocess.Popen(["xray", "run", "-config", config_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -320,28 +321,26 @@ def test_xray_node(node, local_port):
         except:
             try: os.remove(config_path)
             except: pass
-            return False
+            return None
 
     time.sleep(1.0)
-    
+
     if process.poll() is not None:
         try: os.remove(config_path)
         except: pass
-        return False
-    
+        return None
+
     proxies = {
         "http": f"socks5h://127.0.0.1:{local_port}",
         "https": f"socks5h://127.0.0.1:{local_port}"
     }
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-    
+
+    # ۱. تست اتصال به وب‌سایت‌های هدف
     success = True
     for target in TARGETS:
         try:
-            if "openai" in target or "amazon" in target:
-                timeout = 1.0  
-            else:
-                timeout = 0.5  
+            timeout = 1.0 if ("openai" in target or "amazon" in target) else 0.5
             resp = requests.get(target, proxies=proxies, headers=headers, timeout=timeout, allow_redirects=False)
             if resp.status_code is None:
                 success = False
@@ -350,30 +349,55 @@ def test_xray_node(node, local_port):
             success = False
             break
 
+    # ۲. تست دانلود ۱ مگابایت و اندازه گیری سرعت
+    download_time = None
+    if success:
+        try:
+            t_start = time.perf_counter()
+            with requests.get(DOWNLOAD_URL, proxies=proxies, headers=headers, stream=True, timeout=12) as resp:
+                if resp.status_code == 200:
+                    downloaded = 0
+                    for chunk in resp.iter_content(chunk_size=32768):
+                        if chunk:
+                            downloaded += len(chunk)
+                            if downloaded >= 1024 * 1024:  # دریافت کامل ۱ مگابایت
+                                break
+                    if downloaded >= 1024 * 1024:
+                        download_time = time.perf_counter() - t_start
+                    else:
+                        success = False
+                else:
+                    success = False
+        except Exception:
+            success = False
+
     if process:
         process.terminate()
         process.wait()
-        
+
     try: os.remove(config_path)
     except: pass
-    
-    return success
+
+    if success and download_time is not None:
+        node["download_time"] = download_time
+        return node
+    return None
 
 def main():
     global current_stage, progress_info
-    
+
     # مرحله ۱: جمع‌آوری و حذف تکراری‌ها
     current_stage = "مرحله اول: جمع آوری منابع"
     log("شروع جمع‌آوری لینک‌های VLESS...")
     all_raw_links = []
-    
+
     with ThreadPoolExecutor(max_workers=20) as executor:
         futures = {executor.submit(fetch_url, url): url for url in URLS}
         for i, future in enumerate(as_completed(futures), 1):
             res = future.result()
             all_raw_links.extend(res)
             progress_info = f"تعداد سورس‌های بررسی شده: {i}/{len(URLS)}"
-            
+
     unique_links = list(set(all_raw_links))
     log(f"جمع‌آوری به اتمام رسید. کل لینک‌ها: {len(all_raw_links)} | لینک‌های یکتا: {len(unique_links)}")
 
@@ -386,26 +410,24 @@ def main():
     # مرحله ۲ و ۳: فیلترینگ پینگ به روش Async
     current_stage = "مرحله دوم و سوم: فیلتر پینگ و انحراف معیار (Async)"
     log("اجرای پینگ‌های همزمان فوق سریع با معماری غیرمسدودکننده...")
-    
+
     alive_nodes = asyncio.run(run_async_pings(parsed_nodes))
     log(f"پایان تست پینگ سریع. تعداد کانفیگ‌های پایدار اولیه: {len(alive_nodes)}")
 
-    # مرحله ۴: تست اتصال واقعی وبسایت‌ها با Xray Core
-    current_stage = "مرحله چهارم: تست اتصال به وبسایت‌های هدف"
-    log("شروع تست نهایی اتصال با ثبات بالا به وب‌سایت‌ها...")
-    
+    # مرحله ۴: تست اتصال واقعی و دانلود ۱ مگابایت با Xray Core
+    current_stage = "مرحله چهارم: تست اتصال و دانلود ۱ مگابایت"
+    log("شروع تست نهایی اتصال و سرعت دانلود ۱ مگابایتی...")
+
     port_queue = Queue()
     for p in range(14000, 14060):  
         port_queue.put(p)
-        
-    # اصلاح خروجی: ذخیره به صورت دیکشنری کامل نودها به جای رشته ساده URL
+
     final_nodes = []
-    
+
     def worker_xray(node_data):
         port = port_queue.get()
         try:
-            is_ok = test_xray_node(node_data, port)
-            return node_data if is_ok else None  # تغییر یافته جهت نگهداری دیتای نود
+            return test_xray_node(node_data, port)
         finally:
             port_queue.put(port)
 
@@ -417,34 +439,33 @@ def main():
             if res:
                 final_nodes.append(res)
             if idx % 50 == 0 or idx == total_xray:
-                progress_info = f"تست Xray: {idx}/{total_xray} انجام شد. عبور کرده: {len(final_nodes)}"
+                progress_info = f"تست Xray و دانلود: {idx}/{total_xray} انجام شد. عبور کرده: {len(final_nodes)}"
                 log(progress_info)
 
-    log(f"تعداد کانفیگ‌های تایید شده توسط Xray: {len(final_nodes)}")
+    log(f"تعداد کانفیگ‌های تایید شده بر اساس تست دانلود: {len(final_nodes)}")
 
-    # مرحله اصلاحی جدید: فیلتر مجدد بر اساس بازه مجاز پینگ به میلی ثانیه
+    # مرحله اصلاحی: فیلتر مجدد بر اساس بازه مجاز پینگ به میلی ثانیه
     current_stage = "مرحله اصلاحی: فیلتر پینگ‌های نامتعارف"
-    log("شروع فیلتر نهایی پینگ (حذف پینگ‌های خیلی کم و خیلی زیاد)...")
-    
-    # --- تنظیمات بازه پینگ مجاز (میلی ثانیه) ---
-    MIN_PING_LIMIT = 20.0   # پینگ‌های زیر ۲۰ میلی‌ثانیه احتمالاً آیپی داخلی یا ارور لودباکس هستند و حذف می‌شوند
-    MAX_PING_LIMIT = 750.0  # پینگ‌های بالای ۷۵۰ میلی‌ثانیه به دلیل کندی شدید حذف می‌شوند
-    # ----------------------------------------
-    
+    log("شروع فیلتر نهایی پینگ...")
+
+    MIN_PING_LIMIT = 20.0
+    MAX_PING_LIMIT = 750.0
+
     filtered_final_nodes = asyncio.run(run_final_ping_filter(final_nodes, MIN_PING_LIMIT, MAX_PING_LIMIT))
-    log(f"فیلتر پینگ نهایی انجام شد. تعداد نودهای طلایی نهایی: {len(filtered_final_nodes)}")
+    log(f"فیلتر پینگ نهایی انجام شد. تعداد نودهای سالم: {len(filtered_final_nodes)}")
+
+    # مرتب‌سازی بر اساس سرعت (زمان دانلود کمتر = اولویت بالاتر) و جداسازی ۵۰۰ تای برتر
+    filtered_final_nodes.sort(key=lambda x: x.get("download_time", float('inf')))
+    top_500_nodes = filtered_final_nodes[:500]
 
     # مرحله ۵: ذخیره‌سازی خروجی نهایی معتبر
-    current_stage = "مرحله پنجم: ذخیره خروجی"
+    current_stage = "مرحله پنجم: ذخیره ۵۰۰ کانفیگ برتر"
     output_filename = "results.txt"
     with open(output_filename, "w", encoding="utf-8") as f:
-        for node in filtered_final_nodes:
+        for node in top_500_nodes:
             f.write(node["url"] + "\n")
-            
-    log(f"پروژه با موفقیت به پایان رسید! {len(filtered_final_nodes)} کانفیگ طلایی در فایل {output_filename} ذخیره شد.")
 
-if __name__ == "__main__":
-    main()
+    log(f"پروژه با موفقیت به پایان رسید! {len(top_500_nodes)} کانفیگ سریع‌تر در فایل {output_filename} ذخیره شدند.")
 
 if __name__ == "__main__":
     main()
