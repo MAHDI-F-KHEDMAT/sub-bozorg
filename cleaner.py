@@ -456,10 +456,10 @@ def main():
 
     # مرتب‌سازی بر اساس سرعت (زمان دانلود کمتر = اولویت بالاتر) و جداسازی ۵۰۰ تای برتر
     filtered_final_nodes.sort(key=lambda x: x.get("download_time", float('inf')))
-    top_500_nodes = filtered_final_nodes[:500]
+    top_500_nodes = filtered_final_nodes[:1000]
 
     # مرحله ۵: ذخیره‌سازی خروجی نهایی معتبر
-    current_stage = "مرحله پنجم: ذخیره ۵۰۰ کانفیگ برتر"
+    current_stage = "مرحله پنجم: ذخیره ۱۰۰۰ کانفیگ برتر"
     output_filename = "results.txt"
     with open(output_filename, "w", encoding="utf-8") as f:
         for node in top_500_nodes:
